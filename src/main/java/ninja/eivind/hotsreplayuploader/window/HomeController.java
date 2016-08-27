@@ -92,6 +92,8 @@ public class HomeController implements JavaFXController {
     private Label newReplaysCount;
     @FXML
     private Label uploadedReplays;
+    @FXML
+    private ImageView settingsImage;
 
     @Autowired
     private UploaderService uploaderService;
@@ -117,6 +119,10 @@ public class HomeController implements JavaFXController {
         if (uploaderService.isIdle()) {
             setIdle();
         }
+
+        settingsImage.setOnMouseClicked(event -> {
+            LOG.info("Settings button clicked");
+        });
 
         status.textProperty().bind(statusBinder.message());
         setupAccounts();
