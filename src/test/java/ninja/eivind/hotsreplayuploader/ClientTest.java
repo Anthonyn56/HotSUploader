@@ -1,4 +1,4 @@
-// Copyright 2015 Eivind Vegsundvåg
+// Copyright 2015-2016 Eivind Vegsundvåg
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,10 @@
 package ninja.eivind.hotsreplayuploader;
 
 import javafx.concurrent.Task;
+import ninja.eivind.hotsreplayuploader.services.platform.PlatformService;
+import ninja.eivind.hotsreplayuploader.services.platform.TestEnvironmentPlatformService;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.junit.BeforeClass;
@@ -25,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -40,9 +45,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
 
-@ActiveProfiles("test")
 @RunWith(SpringJUnit4ClassRunner.class)
-@SpringBootTest
+@HotsReplayUploaderTest
 public class ClientTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(ClientTest.class);
@@ -53,6 +57,8 @@ public class ClientTest {
 
     @Autowired
     private DataSource dataSource;
+    @Autowired
+    private PlatformService platformService;
 
     @BeforeClass
     public static void setUpClass() throws IOException {
@@ -62,6 +68,12 @@ public class ClientTest {
     @Test
     public void testDataSourceIsEmbedded() {
         assertTrue("DataSource is an instance of EmbeddedDatabase", dataSource instanceof EmbeddedDatabase);
+    }
+
+    @Test
+    public void testPlatformServiceIsTestEnvironment() {
+        assertTrue("PlatformService is an instance of TestEnvironmentPlatformService",
+                platformService instanceof TestEnvironmentPlatformService);
     }
 
     @Test
@@ -77,7 +89,24 @@ public class ClientTest {
         javaFxTask.setOnSucceeded((result) -> latch.countDown());
         new Thread(javaFxTask).run();
 
-        latch.await(1, TimeUnit.SECONDS);
+        if(!latch.await(1, TimeUnit.SECONDS)) {
+            fail("JavaFX is not available.");
+        }
+    }
+
+    @Test
+    public void testNotTryingToReleaseSnapshot() throws Exception {
+        Repository repository = new FileRepositoryBuilder()
+                .findGitDir(new File("."))
+                .build();
+
+        String branch = repository.getBranch();
+
+        final String version = parse.select("project > version").text();
+
+        assertFalse("We are not trying to merge a -SNAPSHOT version into master.",
+                version.contains("-SNAPSHOT") && branch.equals("master"));
+
     }
 
     @Test
@@ -104,6 +133,15 @@ public class ClientTest {
         File icon = new File("src/main/deploy/package/windows/" + appName + ".ico");
 
         assertTrue("Windows icon exists", icon.exists());
+    }
+
+    @Test
+    public void testNonSnapshotBuildIsThreeDigitName() throws Exception {
+        final String version = parse.select("project > version").text();
+        final String regex = "(\\d+\\.){2}\\d+";
+        if(!version.contains("-SNAPSHOT")) {
+            assertTrue("Not a development build, and the version is semver compliant.", version.matches(regex));
+        }
     }
 
     @Test

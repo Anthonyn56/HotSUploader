@@ -18,13 +18,14 @@ import javafx.event.EventType;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
+import ninja.eivind.hotsreplayuploader.files.tempwatcher.BattleLobbyTempDirectories;
+import ninja.eivind.hotsreplayuploader.utils.SimpleHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
 
@@ -46,8 +47,12 @@ public class OSXService implements PlatformService {
     }
 
     @Override
-    public void browse(final URI uri) throws IOException {
-        Desktop.getDesktop().browse(uri);
+    public void browse(final String uri) {
+        try {
+            Desktop.getDesktop().browse(SimpleHttpClient.encode(uri));
+        } catch (IOException e) {
+            LOG.error("Could not open " + uri + " in browser.", e);
+        }
     }
 
     @Override
@@ -83,6 +88,16 @@ public class OSXService implements PlatformService {
     @Override
     public boolean isPreloaderSupported() {
         return false;
+    }
+
+    @Override
+    public BattleLobbyTempDirectories getBattleLobbyTempDirectories() {
+        final File root = new File(USER_HOME, "Library");
+        final File remainder = new File(USER_HOME + "/Library/Caches/TemporaryItems/Blizzard/Heroes of the Storm");
+        return new BattleLobbyTempDirectories(
+                root,
+                remainder
+        );
     }
 
     @Override
